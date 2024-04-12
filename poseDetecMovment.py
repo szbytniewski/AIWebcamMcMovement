@@ -1,6 +1,7 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import pyautogui
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -13,6 +14,7 @@ if not cap.isOpened():
     print("Error: Could not open webcam")
     exit()
 
+screen_width, screen_height = pyautogui.size()
 wrist_above_shoulder = False
 
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
@@ -22,7 +24,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         ret, frame = cap.read()
 
         # Flip the frame horizontaly
-        # frame = cv2.flip(frame ,1)
+        frame = cv2.flip(frame ,1)
 
         # Recolor to RGB
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -37,12 +39,18 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
         try:
             landmarks = result.pose_landmarks.landmark
+            nose = landmarks[mp_pose.PoseLandmark.NOSE.value]
+            nose_x = int(nose.x * screen_width)
+            nose_y = int(nose.y * screen_height)
             if(landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y > landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y):
                 wrist_above_shoulder = True
                 if wrist_above_shoulder:
                     print("W")
             else:
                 wrist_above_shoulder = False
+                print("S")
+
+            pyautogui.moveTo(nose_x, nose_y)
         except:
             pass
 
