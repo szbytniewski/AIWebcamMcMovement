@@ -3,21 +3,21 @@ import time
 import cv2
 import mediapipe as mp
 import numpy as np
-import pyautogui
+import pydirectinput
 
 
-def calulate_mining_angle(shoulder, elbow, wrist):
-    shoulder = np.array(wrist)
-    elbow = np.array(elbow)
-    wrist = np.array(shoulder)
-
-    radians = np.arctan2(shoulder[1]-elbow[1], shoulder[0]-elbow[1]) - np.arctan2(wrist[1]-elbow[1], wrist[0]-elbow[0])
-    angle = np.abs(radians * 180 / np.pi)
+def calculate_angle(a,b,c):
+    a = np.array(a)
+    b = np.array(b)
+    c = np.array(c)
     
-    if angle > 180.0:
-        angle = 360 - angle
-
-    return angle
+    radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
+    angle = np.abs(radians*180.0/np.pi)
+    
+    if angle >180.0:
+        angle = 360-angle
+        
+    return angle 
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -30,11 +30,20 @@ if not cap.isOpened():
     print("Error: Could not open webcam")
     exit()
 
-screen_width, screen_height = pyautogui.size()
+
+prev_nose_x, prev_nose_y = 0, 0
+prev_right_shoulder_y = 0
+prev_left_ankle_y, prev_right_ankle_y = 0, 0
+
+
 wrist_above_shoulder = False
 mining_state = False
-arm_closed = False
-# last_arm_change_time = time.time()
+state = "down"
+
+step_threshold = 0.003            
+last_angle = 0
+last_arm_change_time = time.time()
+motion_timeout = 2
 
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     # Loop to capture frames from the webcam
@@ -56,73 +65,88 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
+        image_height, image_width, _ = frame.shape
+
         try:
             landmarks = result.pose_landmarks.landmark
-            
-            nose = landmarks[mp_pose.PoseLandmark.NOSE.value]
-            nose_x = int(nose.x * screen_width)
-            nose_y = int(nose.y * screen_height)
 
+            # jumping
+            curr_right_shoulder_y = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y
+            if (curr_right_shoulder_y > prev_right_shoulder_y+ 0.05 ):
+                pydirectinput.press("space")
+                # print("jump")
+
+
+            # placing blocks
+            prev_right_shoulder_y = curr_right_shoulder_y
+            if(landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y > landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y):
+                wrist_above_shoulder = True
+                if wrist_above_shoulder:
+                    pydirectinput.rightClick()
+                    # print("placing blocks")
+            else:
+                wrist_above_shoulder = False
+
+
+            # mining
             wristR = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x,landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y] 
             elbowR = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y] 
             shoulderR = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y] 
 
-            angle = calulate_mining_angle(shoulderR, elbowR, wristR)
+            angle = calculate_angle(shoulderR, elbowR, wristR)
 
-            # if angle < 50:  # Arm is considered closed
-            #     if not arm_open:  # Start timer only when arm transitions from closed to open
-            #         arm_open = True
-            #         last_arm_change_time = time.time()
-            # else:
-            #     arm_open = False
 
-            # if arm_open:
-            #     if not mining_state:
-            #         if time.time() - last_arm_change_time <= 3:  # Within 3 seconds to transition
-            #             mining_state = True
-            #             print("Mining started")
-            #     elif time.time() - last_arm_change_time > 3:  # After 6 seconds of inactivity, mining stops
-            #         mining_state = False
-            #         print("Mining stopped due to inactivity")
-
-            if angle < 50:
-                if arm_closed == False:
-                    arm_closed = True
+            if angle < 30:
+                if state != "up":
+                    last_arm_change_time = time.time()  # Reset idle time if arm is in motion
+                    state = "up"
                     mining_state = True
-                    change_state = time.time()
-                    print("TEST")
-            else:
-                arm_closed = False
+            if angle > 150 and state == "up":
+                last_arm_change_time = time.time() # Reset idle time if arm is in motion
+                state = "down"
+                mining_state = True
 
-            if arm_closed:
-                if mining_state:
-                    # Something is wrong below here
-                    if change_state >= 6:  # If the change state is the same after 3 second then mining is not continued
-                        print(change_state)
-                        mining_state = False
-                        print("Mining stopped")
-            else:
-                pass
-
+            # Check if user is inactive 
+            if time.time() - last_arm_change_time > motion_timeout:
+                mining_state = False
 
             if mining_state:
-                # Add code to perform mining action here
+                pydirectinput.leftClick()
                 print("Mining action")
 
-            cv2.putText(image, str(angle), 
-                           tuple(np.multiply(elbowR, [640, 480]).astype(int)), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA
-                                )
-                       
-            if(landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y > landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y):
-                wrist_above_shoulder = True
-                if wrist_above_shoulder:
-                    print("W")
-            else:
-                wrist_above_shoulder = False
-                # print("S")
 
-            pyautogui.moveTo(nose_x, nose_y)
+                       
+
+            # Walking
+            ankleR = landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y
+            ankleL = landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y
+
+            if ankleL > prev_right_ankle_y + step_threshold and ankleR < prev_left_ankle_y - step_threshold:
+                pydirectinput.press('ctrl')
+                pydirectinput.press('ctrl')
+                print("Step forward detected")
+
+            prev_right_ankle_y = ankleL
+            prev_left_ankle_y = ankleR
+
+            # looking around
+            # nose = landmarks[mp_pose.PoseLandmark.NOSE.value]
+            # nose_x = int(nose.x * image_width)
+            # nose_y = int(nose.y * image_height)
+
+            # rel_x = nose_x - prev_nose_x
+            # rel_y = nose_y - prev_nose_y
+
+            # print(rel_x, rel_y)
+
+            # pydirectinput.moveRel(rel_x, rel_y)
+
+            # prev_nose_x, prev_nose_y = nose_x, nose_y
+
+            cv2.putText(image, str(angle), 
+                tuple(np.multiply(elbowR, [640, 480]).astype(int)), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA
+                    )
         except:
             pass
 
