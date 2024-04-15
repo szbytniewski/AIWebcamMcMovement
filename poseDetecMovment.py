@@ -19,6 +19,8 @@ def calculate_angle(a,b,c):
         
     return angle 
 
+pydirectinput.PAUSE = 0
+
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
@@ -31,19 +33,24 @@ if not cap.isOpened():
     exit()
 
 
-prev_nose_x, prev_nose_y = 0, 0
+# Position variables
 prev_right_shoulder_y = 0
 prev_left_ankle_y, prev_right_ankle_y = 0, 0
+prev_nose_x, prev_nose_y = 0, 0
 
-
+# Logic states variables
 wrist_above_shoulder = False
 mining_state = False
 state = "down"
 
+# Other variables 
 step_threshold = 0.003            
 last_angle = 0
 last_arm_change_time = time.time()
-motion_timeout = 2
+last_movment_instace = time.time()
+motion_timeout = 1
+smooth_factor = 5  # Smoothing factor (adjust as needed)
+cumulative_movement_x, cumulative_movement_y = 0, 0
 
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     # Loop to capture frames from the webcam
@@ -73,8 +80,8 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             # jumping
             curr_right_shoulder_y = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y
             if (curr_right_shoulder_y > prev_right_shoulder_y+ 0.05 ):
-                pydirectinput.press("space")
-                # print("jump")
+                # pydirectinput.press("space")
+                print("jump")
 
 
             # placing blocks
@@ -82,8 +89,8 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             if(landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y > landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y):
                 wrist_above_shoulder = True
                 if wrist_above_shoulder:
-                    pydirectinput.rightClick()
-                    # print("placing blocks")
+                    # pydirectinput.rightClick()
+                    print("placing blocks")
             else:
                 wrist_above_shoulder = False
 
@@ -111,7 +118,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 mining_state = False
 
             if mining_state:
-                pydirectinput.leftClick()
+                # pydirectinput.leftClick()
                 print("Mining action")
 
 
@@ -122,31 +129,44 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             ankleL = landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y
 
             if ankleL > prev_right_ankle_y + step_threshold and ankleR < prev_left_ankle_y - step_threshold:
-                pydirectinput.press('ctrl')
-                pydirectinput.press('ctrl')
+                last_movment_instace = time.time()
+                pydirectinput.keyDown('ctrl')
+                pydirectinput.keyDown('w')
                 print("Step forward detected")
+
+
+            if time.time() - last_movment_instace > motion_timeout:
+                pydirectinput.keyUp('ctrl')
+                pydirectinput.keyUp('w')
+
 
             prev_right_ankle_y = ankleL
             prev_left_ankle_y = ankleR
-
-            # looking around
-            # nose = landmarks[mp_pose.PoseLandmark.NOSE.value]
-            # nose_x = int(nose.x * image_width)
-            # nose_y = int(nose.y * image_height)
-
-            # rel_x = nose_x - prev_nose_x
-            # rel_y = nose_y - prev_nose_y
-
-            # print(rel_x, rel_y)
-
-            # pydirectinput.moveRel(rel_x, rel_y)
-
-            # prev_nose_x, prev_nose_y = nose_x, nose_y
 
             cv2.putText(image, str(angle), 
                 tuple(np.multiply(elbowR, [640, 480]).astype(int)), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA
                     )
+            
+            nose_x = int(landmarks[mp_pose.PoseLandmark.NOSE.value].x * image_width)
+            nose_y = int(landmarks[mp_pose.PoseLandmark.NOSE.value].y * image_height)
+
+            nose_x = nose_x * 10
+            nose_y = nose_y * 15
+
+            # Smooth movement
+            smooth_x = prev_nose_x + (nose_x - prev_nose_x) / smooth_factor
+            smooth_y = prev_nose_y + (nose_y - prev_nose_y) / smooth_factor
+
+            # Calculate relative movement
+            rel_x = smooth_x - prev_nose_x
+            rel_y = smooth_y - prev_nose_y
+
+            # Apply movement to cursor
+            pydirectinput.moveRel(int(rel_x), int(rel_y))
+
+            prev_nose_x, prev_nose_y = smooth_x, smooth_y
+
         except:
             pass
 
