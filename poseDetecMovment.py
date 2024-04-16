@@ -80,7 +80,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             # jumping
             curr_right_shoulder_y = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y
             if (curr_right_shoulder_y > prev_right_shoulder_y+ 0.05 ):
-                # pydirectinput.press("space")
+                pydirectinput.press("space")
                 print("jump")
 
 
@@ -89,7 +89,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             if(landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y > landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y):
                 wrist_above_shoulder = True
                 if wrist_above_shoulder:
-                    # pydirectinput.rightClick()
+                    pydirectinput.rightClick()
                     print("placing blocks")
             else:
                 wrist_above_shoulder = False
@@ -118,11 +118,11 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 mining_state = False
 
             if mining_state:
-                # pydirectinput.leftClick()
+                pydirectinput.mouseDown()
                 print("Mining action")
+            else:
+                pydirectinput.mouseUp()
 
-
-                       
 
             # Walking
             ankleR = landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y
@@ -163,7 +163,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             rel_y = smooth_y - prev_nose_y
 
             # Apply movement to cursor
-            pydirectinput.moveRel(int(rel_x), int(rel_y))
+            pydirectinput.moveRel(int(rel_x), int(rel_y))  
 
             prev_nose_x, prev_nose_y = smooth_x, smooth_y
 
