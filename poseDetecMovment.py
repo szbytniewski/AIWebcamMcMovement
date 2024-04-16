@@ -5,7 +5,6 @@ import mediapipe as mp
 import numpy as np
 import pydirectinput
 
-
 def calculate_angle(a,b,c):
     a = np.array(a)
     b = np.array(b)
@@ -32,25 +31,26 @@ if not cap.isOpened():
     print("Error: Could not open webcam")
     exit()
 
+# Constants
+CURSOR_SPEED = 10
 
 # Position variables
 prev_right_shoulder_y = 0
 prev_left_ankle_y, prev_right_ankle_y = 0, 0
-prev_nose_x, prev_nose_y = 0, 0
+first_nose_x, first_nose_y = 0,0
 
 # Logic states variables
 wrist_above_shoulder = False
 mining_state = False
 state = "down"
+first_nose_detected = False 
 
 # Other variables 
-step_threshold = 0.003            
+step_threshold = 0.005         
 last_angle = 0
 last_arm_change_time = time.time()
 last_movment_instace = time.time()
 motion_timeout = 1
-smooth_factor = 5  # Smoothing factor (adjust as needed)
-cumulative_movement_x, cumulative_movement_y = 0, 0
 
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     # Loop to capture frames from the webcam
@@ -79,10 +79,11 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
             # jumping
             curr_right_shoulder_y = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y
-            if (curr_right_shoulder_y > prev_right_shoulder_y+ 0.05 ):
-                pydirectinput.press("space")
-                print("jump")
-
+            if (curr_right_shoulder_y > prev_right_shoulder_y + 0.04 ):
+                pydirectinput.keyDown("space")
+                # print("jump")
+            else:
+                pydirectinput.keyUp("space")
 
             # placing blocks
             prev_right_shoulder_y = curr_right_shoulder_y
@@ -90,10 +91,9 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 wrist_above_shoulder = True
                 if wrist_above_shoulder:
                     pydirectinput.rightClick()
-                    print("placing blocks")
+                    # print("placing blocks")
             else:
                 wrist_above_shoulder = False
-
 
             # mining
             wristR = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x,landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y] 
@@ -101,7 +101,6 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             shoulderR = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y] 
 
             angle = calculate_angle(shoulderR, elbowR, wristR)
-
 
             if angle < 30:
                 if state != "up":
@@ -122,18 +121,17 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 print("Mining action")
             else:
                 pydirectinput.mouseUp()
-
+                pass
 
             # Walking
-            ankleR = landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y
-            ankleL = landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y
+            ankleR = landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y
+            ankleL = landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y
 
             if ankleL > prev_right_ankle_y + step_threshold and ankleR < prev_left_ankle_y - step_threshold:
                 last_movment_instace = time.time()
                 pydirectinput.keyDown('ctrl')
                 pydirectinput.keyDown('w')
-                print("Step forward detected")
-
+                # print("Step forward detected")
 
             if time.time() - last_movment_instace > motion_timeout:
                 pydirectinput.keyUp('ctrl')
@@ -151,30 +149,47 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             nose_x = int(landmarks[mp_pose.PoseLandmark.NOSE.value].x * image_width)
             nose_y = int(landmarks[mp_pose.PoseLandmark.NOSE.value].y * image_height)
 
-            nose_x = nose_x * 10
-            nose_y = nose_y * 15
+            if not first_nose_detected:
+                first_nose_x = nose_x
+                first_nose_y = nose_y
+                first_nose_detected = True
+                print(first_nose_x, first_nose_y)
+                print(first_nose_x + 50, first_nose_y + 50)
+                print(first_nose_x - 50, first_nose_y - 50)
 
-            # Smooth movement
-            smooth_x = prev_nose_x + (nose_x - prev_nose_x) / smooth_factor
-            smooth_y = prev_nose_y + (nose_y - prev_nose_y) / smooth_factor
+            cursor_dx = 0
+            cursor_dy = 0
 
-            # Calculate relative movement
-            rel_x = smooth_x - prev_nose_x
-            rel_y = smooth_y - prev_nose_y
+            if nose_x < first_nose_x - 50:
+                # Move left
+                cursor_dx -= CURSOR_SPEED
+                # print("LEFT")
+            elif nose_x > first_nose_x + 50:
+                # Move right
+                cursor_dx += CURSOR_SPEED
+                # print("RIGHT")
+
+            if nose_y < first_nose_y - 50:
+                # Move up
+                cursor_dy -= CURSOR_SPEED
+                # print("UP")
+            elif nose_y > first_nose_y  + 50 :
+                # Move down
+                cursor_dy += CURSOR_SPEED
+                # print("DOWN")
 
             # Apply movement to cursor
-            pydirectinput.moveRel(int(rel_x), int(rel_y))  
-
-            prev_nose_x, prev_nose_y = smooth_x, smooth_y
+            pydirectinput.moveRel(int(cursor_dx), int(cursor_dy)) 
 
         except:
             pass
+
+        cv2.rectangle(image, (first_nose_x - 25, first_nose_y - 25), (first_nose_x + 25, first_nose_y + 25), (0, 255, 0), 2 )
 
         # Render pose detection and set up colors of dots and lines
         mp_drawing.draw_landmarks(image, result.pose_landmarks, mp_pose.POSE_CONNECTIONS,
                                   mp_drawing.DrawingSpec(color=(50, 0,255), thickness=2,circle_radius=2),
                                   mp_drawing.DrawingSpec(color=(255,0,0), thickness=2,circle_radius=2))
-
 
         # Display the frame
         cv2.imshow('Webcam', image)
@@ -186,3 +201,4 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 # Close and destroy everything
 cap.release()
 cv2.destroyAllWindows()
+ 
