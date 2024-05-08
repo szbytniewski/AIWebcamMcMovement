@@ -1,5 +1,3 @@
-3.8.10
-
 # Playing MC with a Webcam Documentation
 
 ## Table of Contents
