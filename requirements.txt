@@ -1,0 +1,5 @@
+cv2
+time
+mediapipe
+numpy
+pydirectinput
