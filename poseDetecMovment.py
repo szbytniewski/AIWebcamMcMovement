@@ -5,6 +5,7 @@ import mediapipe as mp
 import numpy as np
 import pydirectinput
 
+
 def calculate_angle(a,b,c):
     a = np.array(a)
     b = np.array(b)
@@ -132,7 +133,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             # jumping condition
             if (curr_right_shoulder_y > prev_right_shoulder_y + 0.04 ):
                 pydirectinput.keyDown("space")
-                # print("jump")
+                print("jump")
             else:
                 pydirectinput.keyUp("space")
                 pass
@@ -143,7 +144,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 wrist_above_shoulder = True
                 if wrist_above_shoulder:
                     pydirectinput.rightClick()
-                    # print("placing blocks")
+                    print("placing blocks")
                     # pass
             else:
                 wrist_above_shoulder = False
@@ -167,7 +168,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
             if mining_state:
                 pydirectinput.mouseDown()
-                # print("Mining action")
+                print("Mining action")
                 # pass
             else:
                 pydirectinput.mouseUp()
@@ -179,7 +180,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 last_movment_instace = time.time()
                 pydirectinput.keyDown('ctrl')
                 pydirectinput.keyDown('w')
-                # print("Step forward detected")
+                print("Step forward detected") 
                 # pass
 
             if time.time() - last_movment_instace > motion_timeout:
@@ -206,20 +207,20 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             cursor_dx = 0
             cursor_dy = 0
 
-            if nose_x < first_nose_x - 50:
+            if nose_x < first_nose_x - 25:
                 # Move left
                 cursor_dx -= CURSOR_SPEED
                 # print("LEFT")
-            elif nose_x > first_nose_x + 50:
+            elif nose_x > first_nose_x + 25:
                 # Move right
                 cursor_dx += CURSOR_SPEED
                 # print("RIGHT")
 
-            if nose_y < first_nose_y - 50:
+            if nose_y < first_nose_y - 25:
                 # Move up
                 cursor_dy -= CURSOR_SPEED
                 # print("UP")
-            elif nose_y > first_nose_y  + 50 :
+            elif nose_y > first_nose_y  + 25:
                 # Move down
                 cursor_dy += CURSOR_SPEED
                 # print("DOWN")
